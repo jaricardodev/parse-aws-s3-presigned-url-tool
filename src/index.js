@@ -6,6 +6,7 @@ import { join } from 'path';
 import { parsePresignedUrl } from './parser.js';
 import { generateBrunoCollection } from './generators/bruno.js';
 import { generatePostmanCollection } from './generators/postman.js';
+import { generateCurlCommand } from './generators/curl.js';
 
 async function main() {
   console.log('\n🔗  AWS S3 Pre-signed URL Parser\n');
@@ -49,6 +50,7 @@ async function main() {
       choices: [
         { name: 'Bruno  – generate a Bruno collection JSON', value: 'bruno' },
         { name: 'Postman – generate a Postman Collection v2.1 JSON', value: 'postman' },
+        { name: 'cURL   – generate a cURL command (.sh file)', value: 'curl' },
       ],
     },
   ]);
@@ -64,10 +66,14 @@ async function main() {
     const collection = generateBrunoCollection(parsed);
     filePath = join(outputDir, 'bruno-collection.json');
     writeFileSync(filePath, JSON.stringify(collection, null, 2), 'utf-8');
-  } else {
+  } else if (outputType === 'postman') {
     const collection = generatePostmanCollection(parsed);
     filePath = join(outputDir, 'postman-collection.json');
     writeFileSync(filePath, JSON.stringify(collection, null, 2), 'utf-8');
+  } else {
+    const command = generateCurlCommand(parsed);
+    filePath = join(outputDir, 'request.sh');
+    writeFileSync(filePath, command + '\n', 'utf-8');
   }
 
   console.log(`\n✅  Collection written to: ${filePath}\n`);
