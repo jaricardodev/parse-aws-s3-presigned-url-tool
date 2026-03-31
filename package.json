@@ -9,14 +9,18 @@
     "url": "https://github.com/jaricardodev/parse-aws-s3-presigned-url-tool.git"
   },
   "bin": {
+    "parse-aws-s3-presigned-url-tool": "src/index.js",
     "parse-s3-url": "src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "scripts": {
     "start": "node src/index.js",
     "test": "node --experimental-vm-modules node_modules/.bin/jest"
   },
   "dependencies": {
-    "inquirer": "^13.3.2"
+    "inquirer": "^12.9.6"
   },
   "devDependencies": {
     "jest": "^29.7.0"
