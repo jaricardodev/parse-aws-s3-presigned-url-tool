@@ -1,0 +1,32 @@
+{
+  "name": "parse-aws-s3-presigned-url-tool",
+  "version": "1.0.0",
+  "description": "Interactive CLI tool that parses an AWS S3 pre-signed URL and exports it as a Bruno collection, a Postman collection, or a cURL command",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "parse-s3-url": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest"
+  },
+  "dependencies": {
+    "inquirer": "^13.3.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "transform": {}
+  },
+  "keywords": [
+    "aws",
+    "s3",
+    "presigned-url",
+    "bruno",
+    "postman",
+    "cli"
+  ],
+  "license": "MIT"
+}
