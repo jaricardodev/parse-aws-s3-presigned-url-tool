@@ -4,6 +4,10 @@
   "description": "Interactive CLI tool that parses an AWS S3 pre-signed URL and exports it as a Bruno collection, a Postman collection, or a cURL command",
   "type": "module",
   "main": "src/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jaricardodev/parse-aws-s3-presigned-url-tool"
+  },
   "bin": {
     "parse-s3-url": "src/index.js"
   },
