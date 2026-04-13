@@ -3,7 +3,7 @@
 import inquirer from 'inquirer';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { parsePresignedUrl } from './parser.js';
+import { parsePresignedUrl, parsePresignedUrlToJson } from './parser.js';
 import { generateBrunoCollection } from './generators/bruno.js';
 import { generatePostmanCollection } from './generators/postman.js';
 import { generateCurlCommand } from './generators/curl.js';
@@ -21,9 +21,12 @@ const VALID_FORMATS = ['bruno', 'postman', 'curl'];
  *   --stdout             Write result as JSON to stdout instead of printing a
  *                        human-readable message. Requires --url, --method and
  *                        --format to also be provided.
+ *   --parse              Parse the URL and write the JSON object to stdout,
+ *                        then exit. Only --url is required; --method and
+ *                        --format are ignored.
  *
  * @param {string[]} argv
- * @returns {{ url?: string, method?: string, format?: string, stdout?: boolean }}
+ * @returns {{ url?: string, method?: string, format?: string, stdout?: boolean, parse?: boolean }}
  */
 export function parseArgs(argv) {
   const args = {};
@@ -36,6 +39,8 @@ export function parseArgs(argv) {
       args.format = argv[++i].toLowerCase();
     } else if (argv[i] === '--stdout') {
       args.stdout = true;
+    } else if (argv[i] === '--parse') {
+      args.parse = true;
     }
   }
   return args;
@@ -43,6 +48,23 @@ export function parseArgs(argv) {
 
 async function main() {
   const cliArgs = parseArgs(process.argv.slice(2));
+
+  // ── --parse: dump structured JSON and exit immediately ───────────────────
+  if (cliArgs.parse) {
+    if (!cliArgs.url) {
+      process.stderr.write('\n❌  Error: --parse requires --url to be provided.\n\n');
+      process.exit(1);
+    }
+    try {
+      new URL(cliArgs.url);
+    } catch {
+      process.stderr.write('\n❌  Error: The value provided for --url is not a valid URL.\n\n');
+      process.exit(1);
+    }
+    const parsed = parsePresignedUrlToJson(cliArgs.url);
+    process.stdout.write(JSON.stringify(parsed, null, 2) + '\n');
+    return;
+  }
 
   // When --stdout is requested all three arguments must be supplied via flags
   // so that interactive prompts don't corrupt the machine-readable output.

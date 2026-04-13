@@ -6,6 +6,7 @@ An interactive Node.js CLI tool that parses an AWS S3 pre-signed URL and exports
 
 - Interactive prompts – no flags to memorise
 - **Non-interactive mode** – supply all arguments via flags for scripting and CI use
+- **`--parse` mode** – dumps a structured JSON object of all presigned-URL fields to stdout for direct use in calling code
 - **`--stdout` mode** – outputs the result as JSON for consumption by other Node.js apps
 - **GET mode** – keeps all query parameters as URL parameters
 - **POST mode** – converts every query parameter into a multipart form field (HTML entities in values are decoded automatically)
@@ -280,6 +281,115 @@ console.log('Collection name:', collection.info.name);
 | `--method <method>` | `GET`, `POST` | HTTP method for the generated request |
 | `--format <format>` | `bruno`, `postman`, `curl` | Output format |
 | `--stdout` | _(boolean)_ | Print `{ filePath, content }` JSON to stdout instead of a human-readable message. Requires `--url`, `--method`, and `--format`. |
+| `--parse` | _(boolean)_ | Parse the URL and print the structured JSON object to stdout, then exit. Only `--url` is required; `--method` and `--format` are ignored. |
+
+---
+
+### JSON utility (`--parse`)
+
+Use `--parse` when you want a structured JSON object of all presigned-URL fields
+without generating any collection file. Only `--url` is required.
+
+```bash
+npx parse-s3-url \
+  --url "https://my-bucket.s3.us-east-1.amazonaws.com/uploads/photo.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20230101%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20230101T000000Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=abcdef1234567890" \
+  --parse
+```
+
+Output written to **stdout**:
+
+```json
+{
+  "url": "<original URL>",
+  "baseUrl": "https://my-bucket.s3.us-east-1.amazonaws.com/uploads/photo.jpg",
+  "protocol": "https",
+  "host": "my-bucket.s3.us-east-1.amazonaws.com",
+  "bucket": "my-bucket",
+  "key": "uploads/photo.jpg",
+  "pathname": "/uploads/photo.jpg",
+  "region": "us-east-1",
+  "algorithm": "AWS4-HMAC-SHA256",
+  "credential": "AKIAIOSFODNN7EXAMPLE/20230101/us-east-1/s3/aws4_request",
+  "accessKeyId": "AKIAIOSFODNN7EXAMPLE",
+  "credentialDate": "20230101",
+  "date": "20230101T000000Z",
+  "expires": "3600",
+  "signedHeaders": "host",
+  "signature": "abcdef1234567890",
+  "securityToken": null,
+  "params": {
+    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+    "X-Amz-Credential": "AKIAIOSFODNN7EXAMPLE/20230101/us-east-1/s3/aws4_request",
+    "X-Amz-Date": "20230101T000000Z",
+    "X-Amz-Expires": "3600",
+    "X-Amz-SignedHeaders": "host",
+    "X-Amz-Signature": "abcdef1234567890"
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `url` | The original URL string passed in |
+| `baseUrl` | URL without the query string |
+| `protocol` | `https` or `http` |
+| `host` | Full hostname (e.g. `my-bucket.s3.us-east-1.amazonaws.com`) |
+| `bucket` | Bucket name extracted from a virtual-hosted-style hostname; `null` for path-style URLs |
+| `key` | S3 object key (pathname without the leading `/`) |
+| `pathname` | URL pathname with the leading `/` |
+| `region` | AWS region from the hostname or, as a fallback, from the credential scope; `null` if not determinable |
+| `algorithm` | Value of `X-Amz-Algorithm`; `null` if absent |
+| `credential` | Full value of `X-Amz-Credential`; `null` if absent |
+| `accessKeyId` | First segment of the credential (`<keyId>/…`); `null` if credential absent |
+| `credentialDate` | Second segment of the credential (`…/<date>/…`); `null` if credential absent |
+| `date` | Value of `X-Amz-Date`; `null` if absent |
+| `expires` | Value of `X-Amz-Expires` (seconds as a string); `null` if absent |
+| `signedHeaders` | Value of `X-Amz-SignedHeaders`; `null` if absent |
+| `signature` | Value of `X-Amz-Signature`; `null` if absent |
+| `securityToken` | Value of `X-Amz-Security-Token`; `null` if absent |
+| `params` | All query parameters as a flat `{ name: value }` map (includes non-standard params) |
+
+#### Programmatic import
+
+You can also use `parsePresignedUrlToJson` directly in your own code without spawning a child process:
+
+```js
+import { parsePresignedUrlToJson } from 'parse-aws-s3-presigned-url-tool/src/parser.js';
+
+const presignedUrl = 'https://my-bucket.s3.us-east-1.amazonaws.com/uploads/photo.jpg?X-Amz-Algorithm=...';
+
+const {
+  bucket,
+  key,
+  region,
+  accessKeyId,
+  expires,
+  signature,
+  params,
+} = parsePresignedUrlToJson(presignedUrl);
+
+console.log(`Bucket: ${bucket}, Key: ${key}, Region: ${region}`);
+console.log(`Expires in: ${expires}s`);
+```
+
+#### Calling from a Node.js app via the CLI
+
+```js
+import { execFileSync } from 'child_process';
+
+const raw = execFileSync(
+  'npx',
+  [
+    'parse-s3-url',
+    '--url', 'https://my-bucket.s3.amazonaws.com/file.jpg?X-Amz-Algorithm=...',
+    '--parse',
+  ],
+  { encoding: 'utf-8' }
+);
+
+const { bucket, key, region, expires, signature } = JSON.parse(raw);
+console.log(`Bucket: ${bucket}, Key: ${key}, Region: ${region}`);
+```
 
 ## Running Tests
 
