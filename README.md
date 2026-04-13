@@ -80,23 +80,36 @@ npx parse-s3-url \
   --stdout
 ```
 
-The JSON written to stdout has the following shape:
+#### Output shape
+
+Every `--stdout` run emits exactly one JSON line to stdout:
 
 ```json
 {
-  "filePath": "/absolute/path/to/output/postman-collection.json",
-  "content": "{ ... generated file content ... }"
+  "filePath": "/absolute/path/to/output/<filename>",
+  "content": "<generated file content as a string>"
 }
 ```
 
+| Field | Description |
+|-------|-------------|
+| `filePath` | Absolute path of the file that was written to disk. Use this when you need to pass the file to another tool that expects a path. |
+| `content` | The full text of the generated file. For `bruno` and `postman` formats this is a JSON string (parse it with `JSON.parse`). For `curl` it is a plain shell script string. |
+
 Status and error messages are always written to **stderr**, keeping stdout clean for the JSON payload.
 
-#### Example: calling from a Node.js app
+---
+
+#### Synchronous usage (`execFileSync`)
+
+The simplest approach — blocks until the tool exits, then parses the output.
+
+**Postman format**
 
 ```js
 import { execFileSync } from 'child_process';
 
-const result = execFileSync(
+const raw = execFileSync(
   'npx',
   [
     'parse-s3-url',
@@ -108,9 +121,154 @@ const result = execFileSync(
   { encoding: 'utf-8' }
 );
 
-const { filePath, content } = JSON.parse(result);
-const collection = JSON.parse(content);
-console.log('Postman collection written to:', filePath);
+const { filePath, content } = JSON.parse(raw);
+const collection = JSON.parse(content);          // Postman Collection v2.1 object
+console.log('Written to:', filePath);
+console.log('Collection name:', collection.info.name);
+console.log('First request:', collection.item[0].name);
+```
+
+**Bruno format**
+
+```js
+import { execFileSync } from 'child_process';
+
+const raw = execFileSync(
+  'npx',
+  [
+    'parse-s3-url',
+    '--url', 'https://my-bucket.s3.amazonaws.com/file.jpg?X-Amz-Algorithm=...',
+    '--method', 'GET',
+    '--format', 'bruno',
+    '--stdout',
+  ],
+  { encoding: 'utf-8' }
+);
+
+const { filePath, content } = JSON.parse(raw);
+const collection = JSON.parse(content);          // Bruno collection object
+console.log('Written to:', filePath);
+console.log('Collection name:', collection.name);
+console.log('First item:', collection.items[0].name);
+```
+
+**cURL format**
+
+```js
+import { execFileSync } from 'child_process';
+
+const raw = execFileSync(
+  'npx',
+  [
+    'parse-s3-url',
+    '--url', 'https://my-bucket.s3.amazonaws.com/file.jpg?X-Amz-Algorithm=...',
+    '--method', 'GET',
+    '--format', 'curl',
+    '--stdout',
+  ],
+  { encoding: 'utf-8' }
+);
+
+const { filePath, content } = JSON.parse(raw);
+// `content` is a plain shell script string — no further parsing needed
+console.log('Written to:', filePath);
+console.log('cURL command:\n', content);
+```
+
+---
+
+#### Error handling
+
+`execFileSync` throws when the process exits with a non-zero code. Wrap the call in a `try/catch` and read `err.stderr` for the human-readable error message:
+
+```js
+import { execFileSync } from 'child_process';
+
+try {
+  const raw = execFileSync(
+    'npx',
+    [
+      'parse-s3-url',
+      '--url', 'https://my-bucket.s3.amazonaws.com/file.jpg?X-Amz-Algorithm=...',
+      '--method', 'GET',
+      '--format', 'postman',
+      '--stdout',
+    ],
+    { encoding: 'utf-8' }
+  );
+
+  const { filePath, content } = JSON.parse(raw);
+  const collection = JSON.parse(content);
+  console.log('Done:', filePath);
+} catch (err) {
+  // err.stderr contains the human-readable error written by the tool
+  console.error('Tool failed:', err.stderr || err.message);
+}
+```
+
+---
+
+#### Asynchronous usage (`execFile`)
+
+Use `execFile` when you do not want to block the event loop:
+
+```js
+import { execFile } from 'child_process';
+
+execFile(
+  'npx',
+  [
+    'parse-s3-url',
+    '--url', 'https://my-bucket.s3.amazonaws.com/file.jpg?X-Amz-Algorithm=...',
+    '--method', 'GET',
+    '--format', 'postman',
+    '--stdout',
+  ],
+  { encoding: 'utf-8' },
+  (err, stdout, stderr) => {
+    if (err) {
+      console.error('Tool failed:', stderr || err.message);
+      return;
+    }
+
+    const { filePath, content } = JSON.parse(stdout);
+    const collection = JSON.parse(content);
+    console.log('Done:', filePath);
+    console.log('Collection name:', collection.info.name);
+  }
+);
+```
+
+Or with `util.promisify` for promise-based / async–await code:
+
+```js
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
+
+async function generatePostmanCollection(presignedUrl) {
+  const { stdout, stderr } = await execFileAsync(
+    'npx',
+    [
+      'parse-s3-url',
+      '--url', presignedUrl,
+      '--method', 'GET',
+      '--format', 'postman',
+      '--stdout',
+    ],
+    { encoding: 'utf-8' }
+  );
+
+  const { filePath, content } = JSON.parse(stdout);
+  return { filePath, collection: JSON.parse(content) };
+}
+
+// Usage
+const { filePath, collection } = await generatePostmanCollection(
+  'https://my-bucket.s3.amazonaws.com/file.jpg?X-Amz-Algorithm=...'
+);
+console.log('Written to:', filePath);
 console.log('Collection name:', collection.info.name);
 ```
 
