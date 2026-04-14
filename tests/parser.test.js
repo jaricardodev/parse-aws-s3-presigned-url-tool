@@ -220,6 +220,61 @@ describe('parsePresignedUrlToJson', () => {
     expect(result.params['custom-param']).toBe('hello');
   });
 
+  // ── Presigned POST URL (key is a query/form param, not in the pathname) ──
+  const PRESIGNED_POST_URL =
+    'https://my-bucket.s3.us-east-1.amazonaws.com/' +
+    '?content-type=audio%2Fmpeg' +
+    '&x-amz-meta-app-name=MyApp' +
+    '&x-amz-meta-user-id=user-123' +
+    '&x-amz-meta-voice-journal-id=vj-456' +
+    '&bucket=my-bucket' +
+    '&X-Amz-Algorithm=AWS4-HMAC-SHA256' +
+    '&X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20230101%2Fus-east-1%2Fs3%2Faws4_request' +
+    '&X-Amz-Date=20230101T000000Z' +
+    '&X-Amz-Security-Token=FwoGZXIvYXdzEH' +
+    '&key=uploads%2Fuser-123%2Fentry.mp3' +
+    '&Policy=eyJleHBpcmF0aW9uIjoiMjAyMy0wMS0wMVQwMTowMDowMFoifQ==' +
+    '&X-Amz-Signature=deadbeef1234567890';
+
+  test('presigned POST URL: key is extracted from the key query parameter', () => {
+    const result = parsePresignedUrlToJson(PRESIGNED_POST_URL);
+    expect(result.key).toBe('uploads/user-123/entry.mp3');
+  });
+
+  test('presigned POST URL: bucket extracted from hostname', () => {
+    const result = parsePresignedUrlToJson(PRESIGNED_POST_URL);
+    expect(result.bucket).toBe('my-bucket');
+  });
+
+  test('presigned POST URL: region extracted from hostname', () => {
+    const result = parsePresignedUrlToJson(PRESIGNED_POST_URL);
+    expect(result.region).toBe('us-east-1');
+  });
+
+  test('presigned POST URL: algorithm extracted', () => {
+    const result = parsePresignedUrlToJson(PRESIGNED_POST_URL);
+    expect(result.algorithm).toBe('AWS4-HMAC-SHA256');
+  });
+
+  test('presigned POST URL: securityToken extracted', () => {
+    const result = parsePresignedUrlToJson(PRESIGNED_POST_URL);
+    expect(result.securityToken).toBe('FwoGZXIvYXdzEH');
+  });
+
+  test('presigned POST URL: signature extracted', () => {
+    const result = parsePresignedUrlToJson(PRESIGNED_POST_URL);
+    expect(result.signature).toBe('deadbeef1234567890');
+  });
+
+  test('presigned POST URL: meta params present in params map', () => {
+    const result = parsePresignedUrlToJson(PRESIGNED_POST_URL);
+    expect(result.params['x-amz-meta-app-name']).toBe('MyApp');
+    expect(result.params['x-amz-meta-user-id']).toBe('user-123');
+    expect(result.params['x-amz-meta-voice-journal-id']).toBe('vj-456');
+    expect(result.params['content-type']).toBe('audio/mpeg');
+    expect(result.params['Policy']).toBe('eyJleHBpcmF0aW9uIjoiMjAyMy0wMS0wMVQwMTowMDowMFoifQ==');
+  });
+
   test('bucket is null for path-style URLs', () => {
     const pathStyleUrl =
       'https://s3.us-east-1.amazonaws.com/my-bucket/file.txt?X-Amz-Algorithm=AWS4-HMAC-SHA256' +

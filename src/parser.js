@@ -78,8 +78,10 @@ export function parsePresignedUrlToJson(rawUrl) {
     region = hostMatch[2] && hostMatch[2] !== 's3' ? hostMatch[2] : null;
   }
 
-  // key is the object path without the leading "/"
-  const key = base.pathname.replace(/^\//, '');
+  // key is the object path without the leading "/".
+  // For presigned POST URLs the key is supplied as a query/form parameter
+  // rather than embedded in the pathname, so prefer `params['key']` when set.
+  const key = params['key'] || base.pathname.replace(/^\//, '');
 
   // Split X-Amz-Credential into accessKeyId and credentialDate
   const credential = params['X-Amz-Credential'] || null;
